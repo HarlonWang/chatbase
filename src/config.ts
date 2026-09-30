@@ -71,6 +71,11 @@ export interface ChatConfig {
   onBlocked?: (event: BlockedEvent) => void;
 }
 
+/** 底层出口（callChat / transcribeAudio / fetchChatModels）只需要厂商凭据；宿主的后台任务直接传这个形状 */
+export interface ProviderContext {
+  providers: Partial<Record<ProviderId, ProviderCredentials>>;
+}
+
 /** 解析后的运行时上下文：所有模块只认它，不认 env */
 export interface ChatContext {
   db: D1Database;

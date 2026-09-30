@@ -1,7 +1,7 @@
 // Chat 可选模型目录：每家厂商都从各自的 /models 动态取，准入 / 展示 / 档位是 providers.ts 里各家的策略。
 // 目录是给选择器看的；真正的强制在 resolveModel（纯函数，不查目录）。
 
-import type { ChatContext, ProviderId, Tier } from "./config.js";
+import type { ProviderContext, ProviderId, Tier } from "./config.js";
 import { isRegionBlocked, fetchWithRelayFallback } from "./llm.js";
 import {
   PROVIDER_LIST, canonicalModel, capsOf, minTierOf, providerOwning, hasModelPrice,
@@ -60,7 +60,7 @@ const entry = (id: string, provider: Provider): ModelEntry => ({
  * 未配 key 视为该家未启用：一个模型都不列（列了也调不通），不算失败。
  * 已启用但拉取失败：上次成功的列表 > 该家的 free 地板。
  */
-async function fetchProviderModels(ctx: ChatContext, p: Provider): Promise<{ ids: string[]; ok: boolean }> {
+async function fetchProviderModels(ctx: ProviderContext, p: Provider): Promise<{ ids: string[]; ok: boolean }> {
   const apiKey = ctx.providers[p.id]?.apiKey;
   if (!apiKey) return { ids: [], ok: true };
   const floor = lastGood[p.id] ?? p.catalog.free.slice();
@@ -108,7 +108,7 @@ function logDrift(p: Provider, upstream: Set<string>, offered: string[]): void {
  * 供选择器用的统一目录（缓存 1h）：按注册表顺序逐家追加，每家内部按该家的 sort 排。
  * 一家拉取失败只影响它自己那段。
  */
-export async function fetchChatModels(ctx: ChatContext, now: number = Date.now()): Promise<ModelEntry[]> {
+export async function fetchChatModels(ctx: ProviderContext, now: number = Date.now()): Promise<ModelEntry[]> {
   if (modelsCache && modelsCache.expiresAt > now) return modelsCache.list;
 
   const results = await Promise.all(PROVIDER_LIST.map((p) => fetchProviderModels(ctx, p)));

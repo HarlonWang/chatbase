@@ -6,7 +6,7 @@
 //   失败   → { error, code }     （upstream_error | upstream_timeout | upstream_region_blocked，
 //                                 文案不泄露厂商名）
 
-import type { ChatContext } from "./config.js";
+import type { ProviderContext } from "./config.js";
 import { PROVIDERS, providerOf, type Provider } from "./providers.js";
 import { normalizeUsage, countWebSearchCalls, withSearchCalls, type Usage } from "./usage.js";
 
@@ -89,7 +89,7 @@ export function isRegionBlocked(status: number, detail: unknown): boolean {
  * 未配置中转时自动保持直连。注册表 relay:false 的厂商（不在 CF 网内）永不回落。
  */
 export async function fetchWithRelayFallback(
-  ctx: ChatContext,
+  ctx: ProviderContext,
   path: string,
   init: RequestInit,
   provider: Provider = PROVIDERS.openai,
@@ -116,7 +116,7 @@ export async function fetchWithRelayFallback(
 }
 
 export async function callChat(
-  ctx: ChatContext,
+  ctx: ProviderContext,
   { messages, model, maxTokens, stream = false, retry = 0, tools, maxToolCalls, timeoutMs = UPSTREAM_TIMEOUT_MS }: CallChatOptions,
 ): Promise<CallChatResult> {
   const provider = providerOf(model);
@@ -196,7 +196,7 @@ export async function callChat(
  * 不重试：音频体已随请求上行，重试等于重传，且转写失败由用户重说更自然。
  */
 export async function transcribeAudio(
-  ctx: ChatContext,
+  ctx: ProviderContext,
   { file, filename, model, languages, timeoutMs = UPSTREAM_TIMEOUT_MS }: TranscribeOptions,
 ): Promise<TranscribeResult> {
   const form = new FormData();

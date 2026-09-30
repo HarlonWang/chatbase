@@ -1,6 +1,6 @@
 {
   "name": "@whlong/chatbase",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Shared AI chat foundation for Cloudflare Workers: multi-provider chat, streaming, credits ledger and model catalog, as a Hono sub-app factory.",
   "type": "module",
   "license": "MIT",

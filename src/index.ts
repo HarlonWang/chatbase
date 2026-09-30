@@ -36,6 +36,7 @@ export type {
   CreateChatOptions,
   CreditsConfig,
   PromptConfig,
+  ProviderContext,
   ProviderCredentials,
   ProviderId,
   BlockedEvent,
