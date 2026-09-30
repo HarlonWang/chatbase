@@ -51,5 +51,8 @@
   "allowScripts": {
     "workerd@1.20260312.1": true,
     "workerd@1.20260317.1": true
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }
