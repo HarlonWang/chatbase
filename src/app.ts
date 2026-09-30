@@ -14,10 +14,18 @@ import { jsonError } from "./http.js";
 export function createChatApp<TEnv extends object>(getContext: (env: TEnv) => ChatContext, basePath: string): Hono<{ Bindings: TEnv }> {
   const app = new Hono<{ Bindings: TEnv }>().basePath(basePath);
   const ctxOf = (c: { env: TEnv }) => getContext(c.env);
+  // Hono 的 c.executionCtx 在没传 ExecutionContext 时是抛错而非 undefined（测试 / 非 Workers 宿主）
+  const execOf = (c: { executionCtx: ExecutionContext }): ExecutionContext | undefined => {
+    try {
+      return c.executionCtx;
+    } catch {
+      return undefined;
+    }
+  };
 
-  app.all("/chat", (c) => handleChat(c.req.raw, ctxOf(c), c.executionCtx));
+  app.all("/chat", (c) => handleChat(c.req.raw, ctxOf(c), execOf(c)));
   app.all("/chat/models", (c) => handleChatModels(c.req.raw, ctxOf(c)));
-  app.all("/chat/transcribe", (c) => handleChatTranscribe(c.req.raw, ctxOf(c), c.executionCtx));
+  app.all("/chat/transcribe", (c) => handleChatTranscribe(c.req.raw, ctxOf(c), execOf(c)));
   app.all("/chat/generated-images/:key", (c) => handleGeneratedImage(c.req.raw, ctxOf(c), c.req.param("key")));
   app.all("/quota", (c) => handleQuota(c.req.raw, ctxOf(c)));
   app.notFound(() => jsonError("Not found", 404, "not_found"));
