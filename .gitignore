@@ -1,0 +1,12 @@
+# Node
+node_modules/
+dist/
+
+
+# IDE / OS
+.idea/
+.DS_Store
+
+# Wrangler
+.wrangler/
+.dev.vars

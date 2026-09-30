@@ -1,0 +1,11 @@
+# 仅供测试使用：@cloudflare/vitest-pool-workers 据此搭 miniflare 环境（本地 D1 模拟）。
+# 本包是库，不部署 Worker。
+name = "chatbase-test"
+main = "src/index.ts"
+compatibility_date = "2026-03-17"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "chatbase-test"
+database_id = "chatbase-test"
+migrations_dir = "migrations"
