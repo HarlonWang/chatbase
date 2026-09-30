@@ -1,7 +1,7 @@
 # AI Chat 线上协议
 
-> **本文是客户端 chat SDK 与服务端之间的唯一权威**：服务端实现与本文必须同一个 commit 落地，客户端仓（TrendingAI `:chat` 模块）不留副本，只留一行指针。
-> 变更规则见「兼容策略」。凡带 **[v2 新增]** 标记的条目随多厂商接入一起上线（方案见 TrendingProjects `ai-多厂商-方案.md`）；带 **[v3 新增]** 的随图片生成一起上线（方案见 TrendingProjects `ai-chat-图片生成-方案.md`）。未标记的即当前线上行为。
+> **本文是客户端 chat SDK（chatbase-kmp）与本库之间的唯一权威**：服务端实现与本文必须同一个 commit 落地，客户端仓不留副本，只留一行指针。
+> 变更规则见「兼容策略」。**[v2 新增]** 标记的条目随多厂商接入上线，**[v3 新增]** 的随图片生成上线；未标记的即基线行为。
 >
 > 版本 **1.0**（2026-09-08 按线上现状整理）。
 
@@ -14,7 +14,7 @@
 | `POST` | `/api/chat/transcribe` | 可选 Bearer，实际要求 Pro | 语音转写，只吐文本 |
 | `GET` | `/api/chat/generated-images/:key` **[v3 新增]** | 无 | 回吐生成图（见下） |
 
-生产域名 `https://api.trendingai.cn`。所有端点响应 CORS 头并接受 `OPTIONS` 预检。
+路径前缀 `/api` 是默认挂载点，宿主可通过 `createChat(resolve, { basePath })` 改；域名由各宿主决定。所有端点响应 CORS 头并接受 `OPTIONS` 预检。
 
 ## `GET /api/chat/generated-images/:key` **[v3 新增]**
 
