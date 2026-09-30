@@ -40,7 +40,7 @@ function makeSettler(ctx: ChatContext, gate: Extract<BillingGate, { error?: unde
 }
 type ResolvedTierValue = "anonymous" | "user" | "pro";
 
-export async function handleChat(request: Request, ctx: ChatContext, exec?: ExecutionContext): Promise<Response> {
+export async function handleChat(request: Request, ctx: ChatContext, exec?: Pick<ExecutionContext, "waitUntil">): Promise<Response> {
   const blocked = methodGuard(request, ["POST"]);
   if (blocked) return blocked;
   const { installId, errorResponse: noInstall } = requireInstallId(request);

@@ -15,7 +15,7 @@ function languageHints(lang: string): string[] {
   return lang === "zh" ? ["zh-cn", "en"] : ["en", "zh-cn"];
 }
 
-export async function handleChatTranscribe(request: Request, ctx: ChatContext, exec?: ExecutionContext): Promise<Response> {
+export async function handleChatTranscribe(request: Request, ctx: ChatContext, exec?: Pick<ExecutionContext, "waitUntil">): Promise<Response> {
   const blocked = methodGuard(request, ["POST"]);
   if (blocked) return blocked;
 

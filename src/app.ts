@@ -15,7 +15,7 @@ export function createChatApp<TEnv extends object>(getContext: (env: TEnv) => Ch
   const app = new Hono<{ Bindings: TEnv }>().basePath(basePath);
   const ctxOf = (c: { env: TEnv }) => getContext(c.env);
   // Hono 的 c.executionCtx 在没传 ExecutionContext 时是抛错而非 undefined（测试 / 非 Workers 宿主）
-  const execOf = (c: { executionCtx: ExecutionContext }): ExecutionContext | undefined => {
+  const execOf = (c: { executionCtx: Pick<ExecutionContext, "waitUntil"> }): Pick<ExecutionContext, "waitUntil"> | undefined => {
     try {
       return c.executionCtx;
     } catch {
