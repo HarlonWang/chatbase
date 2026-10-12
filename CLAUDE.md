@@ -2,16 +2,15 @@
 
 多 App 共用的 AI chat 底座：多厂商模型调用、SSE 流、账本计费、模型目录，以 Hono 子应用工厂发布为 npm 包 `@whlong/chatbase`，挂进宿主自己的 Cloudflare Worker，数据落宿主自己的 D1。与 loginbase / eventbase 同型。
 
-**开工前先读 README.md 和 `docs/chat-protocol.md`**（线上协议，客户端 SDK 的唯一权威）。抽取方案与边界在 `~/TonoChatProjects/chatbase-抽取方案.md`，宿主接入说明在 `~/TonoChatProjects/chatbase-接入说明.md`。
+**开工前先读 README.md 和 `docs/chat-protocol.md`**（线上协议，客户端 SDK 的唯一权威）。
 
 ## 关联仓库
 
-| 路径 | 角色 |
+| 仓库 | 角色 |
 |---|---|
-| `~/TrendingProjects/github-ai-trending-api` | **源头与首个宿主**：本仓从它的 `src/lib/{providers,llm,models,sse,stream-parse,credits,chat/*}.js` 与 `src/api/{chat,chat-models,chat-transcribe,quota,generated-image}.js` 抽出；切换后它改为依赖本包 |
-| `~/TonoChatProjects` | 第二个宿主 Tono 的总览与文档 |
-| `~/TrendingProjects/TrendingAI/chat` → `HarlonWang/chatbase-kmp` | 客户端 SDK（KMP + CMP），协议以本仓 `docs/chat-protocol.md` 为准，客户端仓不留副本 |
-| `~/loginbase`、`~/eventbase` | 姊妹底座，工程结构与发布流程照它们 |
+| github-ai-trending-api | **源头与首个宿主**：本仓从它的 `src/lib/{providers,llm,models,sse,stream-parse,credits,chat/*}.js` 与 `src/api/{chat,chat-models,chat-transcribe,quota,generated-image}.js` 抽出；切换后它改为依赖本包 |
+| chatbase-kmp（`HarlonWang/chatbase-kmp`） | 客户端 SDK（KMP + CMP），协议以本仓 `docs/chat-protocol.md` 为准，客户端仓不留副本 |
+| loginbase、eventbase | 姊妹底座，工程结构与发布流程照它们 |
 
 ## 铁律
 
