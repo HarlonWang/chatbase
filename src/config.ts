@@ -37,6 +37,11 @@ export interface ModelsConfig {
   free?: string[];
 }
 
+export interface LoggingConfig {
+  /** chat_logs 保留天数（正整数）：day 早于等于「今天 - N 天」的行由 Chat.purge 删除。不给则永久保留 */
+  retentionDays?: number;
+}
+
 export interface ChatContextInput {
   /** 请求体里的 context，形状由宿主与其客户端约定 */
   title?: string;
@@ -76,8 +81,8 @@ export interface ChatConfig {
   resolveTier: TierResolver;
   prompt: PromptConfig;
   credits?: Partial<CreditsConfig>;
-  /** 写 chat_logs，默认 true */
-  logging?: boolean;
+  /** 写 chat_logs，默认 true；给对象即开启并附保留策略 */
+  logging?: boolean | LoggingConfig;
   /** 配额拦截回调（埋点用），必须自吞异常 */
   onBlocked?: (event: BlockedEvent) => void;
 }
@@ -99,6 +104,8 @@ export interface ChatContext {
   prompt: PromptConfig;
   credits: CreditsConfig;
   logging: boolean;
+  /** chat_logs 保留天数；null 为永久保留，purge 不删 */
+  logRetentionDays: number | null;
   onBlocked: ((event: BlockedEvent) => void) | null;
   /** 端点挂载点（来自 createChat 的 options），生成图 URL 以它为前缀 */
   basePath: string;
@@ -130,10 +137,18 @@ export function resolveContext(config: ChatConfig, basePath = "/api"): ChatConte
       rateCard: { ...DEFAULT_CREDITS.rateCard, ...(config.credits?.rateCard ?? {}) },
       globalBudgetMicros: { ...DEFAULT_CREDITS.globalBudgetMicros, ...(config.credits?.globalBudgetMicros ?? {}) },
     },
-    logging: config.logging ?? true,
+    logging: config.logging !== false,
+    logRetentionDays: resolveRetentionDays(config.logging),
     onBlocked: config.onBlocked ?? null,
     basePath,
   };
+}
+
+function resolveRetentionDays(logging: ChatConfig["logging"]): number | null {
+  const days = typeof logging === "object" ? logging.retentionDays : undefined;
+  if (days === undefined) return null;
+  if (!Number.isInteger(days) || days < 1) throw new Error(`[chatbase] logging.retentionDays must be a positive integer, got ${days}`);
+  return days;
 }
 
 /** 按 env 对象身份缓存解析结果：Workers 里同一 isolate 内 env 恒同一引用 */

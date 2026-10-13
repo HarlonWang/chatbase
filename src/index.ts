@@ -2,6 +2,7 @@ import type { Hono } from "hono";
 import { memoizeResolver, type ChatConfig, type ChatContext, type CreateChatOptions } from "./config.js";
 import { createChatApp } from "./app.js";
 import { reclaimOrphanedPending } from "./credits.js";
+import { purgeChatLogs, type PurgeResult } from "./chat-logs.js";
 
 export interface Chat<TEnv extends object> {
   /** Hono 实例（已含 basePath）。Hono 消费方：app.route("/", chat.app) */
@@ -10,6 +11,8 @@ export interface Chat<TEnv extends object> {
   fetch: (request: Request, env: TEnv, ctx?: ExecutionContext) => Response | Promise<Response>;
   /** cron：回收孤儿 pending 账单行，建议每 10 分钟 */
   reclaim: (env: TEnv) => Promise<{ scanned: number; reclaimed: number; refunded: number }>;
+  /** cron：按 logging.retentionDays 删超期 chat_logs，每次至多 1000 行；未配置时不做任何事。可与 reclaim 同频 */
+  purge: (env: TEnv) => Promise<PurgeResult>;
   /** 解析后的上下文，供宿主复用底层出口（如 callChat）时传入 */
   context: (env: TEnv) => ChatContext;
 }
@@ -25,6 +28,7 @@ export function createChat<TEnv extends object = any>(
     app,
     fetch: (request, env, ctx) => app.fetch(request, env, ctx),
     reclaim: (env) => reclaimOrphanedPending(getContext(env)),
+    purge: (env) => purgeChatLogs(getContext(env)),
     context: getContext,
   };
 }
@@ -35,6 +39,7 @@ export type {
   ChatContextInput,
   CreateChatOptions,
   CreditsConfig,
+  LoggingConfig,
   ModelsConfig,
   PromptConfig,
   ProviderContext,
@@ -58,3 +63,4 @@ export { getChatImagesConfig, CHAT_IMAGES_DEFAULTS } from "./chat-images.js";
 export { getChatVoiceConfig, CHAT_VOICE_DEFAULTS, TRANSCRIBE_MODEL } from "./chat-voice.js";
 export { renderItemContext } from "./chat/input.js";
 export type { Usage } from "./usage.js";
+export type { PurgeResult } from "./chat-logs.js";

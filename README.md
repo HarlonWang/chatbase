@@ -62,6 +62,7 @@ export default {
   },
   scheduled(_event, env, ctx) {
     ctx.waitUntil(chat.reclaim(env));   // every 10 minutes
+    ctx.waitUntil(chat.purge(env));     // deletes expired chat_logs; no-op without logging.retentionDays
   },
 };
 ```
@@ -82,7 +83,7 @@ Hono hosts use `app.route("/", chat.app)` instead of `chat.fetch`.
 | `prompt.system` | no | Replace the whole system prompt |
 | `prompt.context` | no | Render the request's `context` into the system prompt; ignored when absent |
 | `credits` | no | `dailyGrant`, `rateCard`, `globalBudgetMicros`; defaults exported as `DEFAULT_CREDITS` |
-| `logging` | no | Write user questions to `chat_logs` (default `true`) |
+| `logging` | no | Write user questions to `chat_logs` (default `true`). `{ retentionDays: 90 }` also keeps logging on and lets `chat.purge` delete rows older than that, up to 1000 per run. Without it logs are kept forever |
 | `onBlocked` | no | Called when a request is refused by quota, for analytics |
 
 `createChat(resolve, { basePath })` changes the mount point (default `/api`).
