@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { handleChatTranscribe } from "../../src/handlers/transcribe.js";
-import { makeCtx, tierInfo, EXEC, json, type TestCtx } from "./helpers.js";
+import { makeCtx, tierInfo, EXEC, json, hasSql, type TestCtx } from "./helpers.js";
 
 // Pro 场景以 userIdentity 余额表达用量状态；last_grant_tier=pro 才不触发按档重授
 const proCtx = ({ balance = 90, tier = tierInfo("pro", "pro-1"), kv }: { balance?: number; tier?: ReturnType<typeof tierInfo>; kv?: unknown } = {}) =>
@@ -93,6 +93,20 @@ describe("handleChatTranscribe", () => {
     const res = await call(makePost(), proCtx({ tier: tierInfo("user", "u-1") }));
     expect(res.status).toBe(403);
     expect(upstreamCall(fetchMock)).toBeUndefined();
+  });
+
+  it("未配 OpenAI key → 502 upstream_error，不扣额度、不打上游", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const fetchMock = stubFetch();
+    const ctx = makeCtx({
+      db: { userIdentity: { balance: 90, last_grant_tier: "pro" } }, tier: tierInfo("pro", "pro-1"),
+      providers: { zhipu: { apiKey: "k" } }, config: { models: { free: ["glm-5.3-flash"] } },
+    });
+    const res = await call(makePost(), ctx);
+    expect(res.status).toBe(502);
+    expect((await json(res)).code).toBe("upstream_error");
+    expect(upstreamCall(fetchMock)).toBeUndefined();
+    expect(hasSql(ctx.db, "INSERT INTO usage_events")).toBe(false);
   });
 
   it("宿主判定 authInvalid → 401 auth_invalid", async () => {

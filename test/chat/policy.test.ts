@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { decideChatPolicy, MAX_TOKENS, type ChatPolicy } from "../../src/chat/policy.js";
-import { DEFAULT_MODEL } from "../../src/models.js";
+import { resolveFreeModels, type ModelScope } from "../../src/models.js";
 import type { ChatRequest } from "../../src/chat/request.js";
 import type { Tier } from "../../src/config.js";
 
@@ -8,6 +8,9 @@ const base: ChatRequest = {
   messages: [{ role: "user", content: "q" }], lastText: "q", lang: "en", context: null,
   imageCount: 0, wantSearch: false, wantImageGeneration: false, wantStream: true, requestedModel: undefined,
 };
+const providers = { openai: { apiKey: "k" }, deepseek: { apiKey: "k" }, zhipu: { apiKey: "k" } };
+const SCOPE: ModelScope = { providers, freeModels: resolveFreeModels(providers) };
+const DEFAULT_MODEL = SCOPE.freeModels[0];
 const ok = (p: ReturnType<typeof decideChatPolicy>): ChatPolicy => {
   if (p.error) throw new Error(`unexpected deny: ${p.error.code}`);
   return p;
@@ -24,17 +27,17 @@ describe("decideChatPolicy：档位 × 模型 × 能力 × 开关（表驱动）
     ["Pro 选 DeepSeek 开搜索", { wantSearch: true, requestedModel: "deepseek-v4-flash" }, "pro", 400, "search_unsupported"],
     ["Pro 选 DeepSeek 开生图", { wantImageGeneration: true, requestedModel: "deepseek-v4-flash" }, "pro", 400, "image_generation_unsupported"],
   ])("%s → %i %s", (_n, over, tier, status, code) => {
-    expect(decideChatPolicy({ ...base, ...over }, tier).error).toMatchObject({ status, code });
+    expect(decideChatPolicy({ ...base, ...over }, tier, SCOPE).error).toMatchObject({ status, code });
   });
 
   it("先档位后能力：免费用户 + DeepSeek + 生图 → 先报「要 Pro」不是「模型不支持」", () => {
     // 非 Pro 请求 DeepSeek 会被降级回默认模型，随后生图规则按档位先拦
-    expect(decideChatPolicy({ ...base, wantImageGeneration: true, requestedModel: "deepseek-v4-flash" }, "user").error!.code).toBe("image_generation_requires_pro");
-    expect(decideChatPolicy({ ...base, wantSearch: true, requestedModel: "deepseek-v4-flash" }, "user").error!.code).toBe("search_requires_pro");
+    expect(decideChatPolicy({ ...base, wantImageGeneration: true, requestedModel: "deepseek-v4-flash" }, "user", SCOPE).error!.code).toBe("image_generation_requires_pro");
+    expect(decideChatPolicy({ ...base, wantSearch: true, requestedModel: "deepseek-v4-flash" }, "user", SCOPE).error!.code).toBe("search_requires_pro");
   });
 
   it("普通对话：默认模型、feature=chat、不挂工具、无额外预估成本", () => {
-    const p = ok(decideChatPolicy(base, "anonymous"));
+    const p = ok(decideChatPolicy(base, "anonymous", SCOPE));
     expect(p.model).toBe(DEFAULT_MODEL);
     expect(p.feature).toBe("chat");
     expect(p.extraCostMicros).toBe(0);
@@ -42,14 +45,14 @@ describe("decideChatPolicy：档位 × 模型 × 能力 × 开关（表驱动）
   });
 
   it("Pro 搜索：feature=chat_search，挂 web_search，max_tool_calls=3", () => {
-    const p = ok(decideChatPolicy({ ...base, wantSearch: true }, "pro"));
+    const p = ok(decideChatPolicy({ ...base, wantSearch: true }, "pro", SCOPE));
     expect(p.feature).toBe("chat_search");
     expect(p.upstream.tools).toEqual([{ type: "web_search", search_context_size: "medium" }]);
     expect(p.upstream.maxToolCalls).toBe(3);
   });
 
   it("Pro 生图：feature=chat_image_generation，工具来自厂商注册表，1 张封顶，按张费进熔断预估", () => {
-    const p = ok(decideChatPolicy({ ...base, wantImageGeneration: true }, "pro"));
+    const p = ok(decideChatPolicy({ ...base, wantImageGeneration: true }, "pro", SCOPE));
     expect(p.feature).toBe("chat_image_generation");
     expect((p.upstream.tools![0] as any).type).toBe("image_generation");
     expect(p.upstream.maxToolCalls).toBe(1);
@@ -57,14 +60,14 @@ describe("decideChatPolicy：档位 × 模型 × 能力 × 开关（表驱动）
   });
 
   it("非 Pro 请求付费模型被降回默认；Pro 可切", () => {
-    expect(ok(decideChatPolicy({ ...base, requestedModel: "gpt-5.6-sol" }, "user")).model).toBe(DEFAULT_MODEL);
-    expect(ok(decideChatPolicy({ ...base, requestedModel: "gpt-5.6-sol" }, "pro")).model).toBe("gpt-5.6-sol");
+    expect(ok(decideChatPolicy({ ...base, requestedModel: "gpt-5.6-sol" }, "user", SCOPE)).model).toBe(DEFAULT_MODEL);
+    expect(ok(decideChatPolicy({ ...base, requestedModel: "gpt-5.6-sol" }, "pro", SCOPE)).model).toBe("gpt-5.6-sol");
   });
 
   it("imagesEnabled=false：Pro 开生图 → 400 image_generation_unsupported；档位规则仍先于它", () => {
-    expect(decideChatPolicy({ ...base, wantImageGeneration: true }, "pro", { imagesEnabled: false }).error).toMatchObject({ status: 400, code: "image_generation_unsupported" });
-    expect(decideChatPolicy({ ...base, wantImageGeneration: true }, "user", { imagesEnabled: false }).error!.code).toBe("image_generation_requires_pro");
+    expect(decideChatPolicy({ ...base, wantImageGeneration: true }, "pro", SCOPE, { imagesEnabled: false }).error).toMatchObject({ status: 400, code: "image_generation_unsupported" });
+    expect(decideChatPolicy({ ...base, wantImageGeneration: true }, "user", SCOPE, { imagesEnabled: false }).error!.code).toBe("image_generation_requires_pro");
     // 不开生图时该开关无影响
-    expect(ok(decideChatPolicy(base, "pro", { imagesEnabled: false })).feature).toBe("chat");
+    expect(ok(decideChatPolicy(base, "pro", SCOPE, { imagesEnabled: false })).feature).toBe("chat");
   });
 });

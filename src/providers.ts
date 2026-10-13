@@ -40,7 +40,7 @@ export interface Provider {
     admit: (id: string) => boolean;
     displayName: (id: string) => string;
     sort: (a: string, b: string) => number;
-    /** 免费可用白名单（安全下限，唯一硬编码）；目录拉取失败时的地板 */
+    /** 内置免费白名单：宿主未给 ChatConfig.models.free 时的缺省（安全下限，唯一硬编码） */
     free: string[];
     defaultTier: Tier;
   };
@@ -222,11 +222,12 @@ export function capsOf(modelId: string): ModelCaps {
   return { ...p.defaultCaps, ...(p.overrides[model]?.caps ?? {}) };
 }
 
-/** 模型档位：按 id 覆盖 > 免费白名单 > 厂商默认 */
-export function minTierOf(modelId: string): Tier {
+/** 模型档位：按 id 覆盖 > 免费白名单 > 厂商默认。freeModels 是宿主解析后的白名单（ChatContext.freeModels），不给用厂商内置 */
+export function minTierOf(modelId: string, freeModels?: string[]): Tier {
   const model = canonicalModel(modelId);
   const p = providerOf(model);
-  return p.overrides[model]?.minTier ?? (p.catalog.free.includes(model) ? "user" : p.catalog.defaultTier);
+  const free = freeModels ?? p.catalog.free;
+  return p.overrides[model]?.minTier ?? (free.includes(model) ? "user" : p.catalog.defaultTier);
 }
 
 /** 登记的牌价；未登记 → undefined（由 credits.ts 按保守 default 计） */

@@ -75,7 +75,8 @@ Hono hosts use `app.route("/", chat.app)` instead of `chat.fetch`.
 | `db` | yes | D1 holding the four tables |
 | `kv` | no | Reads `chat_images` and `chat_voice` keys for runtime limits |
 | `images` | no | R2 bucket; without it image generation is refused |
-| `providers` | yes | Enabled providers and keys; `openai.relay` adds a fallback for region-blocked requests |
+| `providers` | yes | Enabled providers and keys; `openai.relay` adds a fallback for region-blocked requests. Voice transcription and image generation are OpenAI-only |
+| `models.free` | no | Models open to anonymous and signed-in free users; the first is the default. Must belong to enabled providers. Defaults to the built-in free models of enabled providers (OpenAI only today); if that is empty, or a listed model's provider has no key, context resolution throws on the first request. A DeepSeek- or Zhipu-only host must set it |
 | `resolveTier` | yes | `(request) => { tier: "anonymous" } \| { tier: "user" \| "pro", userSub } \| { authInvalid: true }` |
 | `prompt.brand` | yes | Product name in the system prompt |
 | `prompt.system` | no | Replace the whole system prompt |

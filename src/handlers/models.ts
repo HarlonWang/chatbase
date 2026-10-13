@@ -1,6 +1,6 @@
 import type { ChatContext } from "../config.js";
 import { methodGuard, jsonOk } from "../http.js";
-import { fetchChatModels, DEFAULT_MODEL } from "../models.js";
+import { fetchChatModels, defaultModel } from "../models.js";
 
 /**
  * GET /chat/models —— 供客户端渲染模型选择器。
@@ -13,5 +13,5 @@ export async function handleChatModels(request: Request, ctx: ChatContext): Prom
   if (blocked) return blocked;
 
   const models = await fetchChatModels(ctx);
-  return jsonOk({ default: DEFAULT_MODEL, models }, 300);
+  return jsonOk({ default: defaultModel(ctx), models }, 300);
 }

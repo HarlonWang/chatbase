@@ -55,7 +55,7 @@ export async function handleChat(request: Request, ctx: ChatContext, exec?: Pick
   if (tierInfo.errorResponse) return tierInfo.errorResponse;
   const { tier, userSub } = tierInfo;
 
-  const policy = decideChatPolicy(req, tier, { imagesEnabled: ctx.images != null });
+  const policy = decideChatPolicy(req, tier, ctx, { imagesEnabled: ctx.images != null });
   if (policy.error) return fail(policy.error);
 
   const day = todayUTC();

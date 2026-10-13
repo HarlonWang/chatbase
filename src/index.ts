@@ -35,6 +35,7 @@ export type {
   ChatContextInput,
   CreateChatOptions,
   CreditsConfig,
+  ModelsConfig,
   PromptConfig,
   ProviderContext,
   ProviderCredentials,
@@ -50,7 +51,8 @@ export { DEFAULT_CREDITS, resolveContext } from "./config.js";
 export { callChat, transcribeAudio } from "./llm.js";
 export { PROVIDERS, canonicalModel, capsOf, minTierOf, priceOf, hasModelPrice, providerOf } from "./providers.js";
 export type { Provider, ModelCaps, ModelPrice } from "./providers.js";
-export { resolveModel, isOfferedModel, fetchChatModels, DEFAULT_MODEL, FREE_MODELS } from "./models.js";
+export { resolveModel, isOfferedModel, fetchChatModels, defaultModel } from "./models.js";
+export type { ModelEntry, ModelScope } from "./models.js";
 export { computeTrueCostMicros, nextGrantAtUTC, PENDING_TIMEOUT_MS } from "./credits.js";
 export { getChatImagesConfig, CHAT_IMAGES_DEFAULTS } from "./chat-images.js";
 export { getChatVoiceConfig, CHAT_VOICE_DEFAULTS, TRANSCRIBE_MODEL } from "./chat-voice.js";

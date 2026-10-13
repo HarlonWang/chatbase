@@ -3,7 +3,7 @@
 // 不静默降级——用户付了额度，图片被上游换成占位符等于白扣。客户端按目录 caps 隐藏入口，这里只兜旧客户端。
 
 import type { Tier } from "../config.js";
-import { resolveModel } from "../models.js";
+import { resolveModel, type ModelScope } from "../models.js";
 import { capsOf, providerOf, type Provider } from "../providers.js";
 import type { ChatRequest } from "./request.js";
 
@@ -37,12 +37,12 @@ const deny = (message: string, status: number, code: string): PolicyError => ({ 
  * (请求, 档位, 生图是否可用) → 上游与计费参数 | { error }。
  * 规则顺序有意义：先档位后能力，让免费用户拿到的是「要 Pro」而不是「模型不支持」。
  */
-export function decideChatPolicy(req: ChatRequest, tier: Tier, { imagesEnabled = true }: { imagesEnabled?: boolean } = {}): ChatPolicy | PolicyError {
+export function decideChatPolicy(req: ChatRequest, tier: Tier, scope: ModelScope, { imagesEnabled = true }: { imagesEnabled?: boolean } = {}): ChatPolicy | PolicyError {
   // 图片理解仅登录档开放（客户端隐藏入口只是体验层，这里是真闸）
   if (req.imageCount > 0 && tier === "anonymous") return deny("Image input requires login", 403, "images_require_login");
 
   // 模型按 tier 强制（免费只能默认，Pro 可切任一「可提供」模型，见 models.ts）
-  const model = resolveModel(tier, req.requestedModel);
+  const model = resolveModel(scope, tier, req.requestedModel);
   const caps = capsOf(model);
   const provider = providerOf(model);
 

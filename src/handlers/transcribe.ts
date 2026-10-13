@@ -49,6 +49,11 @@ export async function handleChatTranscribe(request: Request, ctx: ChatContext, e
   const { tier, userSub } = tierInfo;
   // 客户端隐藏入口只是体验层，这里是真闸
   if (tier !== "pro") return jsonError("Voice input requires Pro", 403, "voice_requires_pro");
+  // 转写只有 OpenAI 一家：未配 key 时不扣额度、不打上游
+  if (!ctx.providers.openai?.apiKey) {
+    console.error("[transcribe] openai api key missing");
+    return jsonError("Upstream error", 502, "upstream_error");
+  }
 
   const gate = await runBillingGate(ctx, {
     installId, userSub, tier, feature: FEATURE, day,

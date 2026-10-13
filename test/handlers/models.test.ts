@@ -1,13 +1,14 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { handleChatModels } from "../../src/handlers/models.js";
-import { clearModelsCache } from "../../src/models.js";
+import { clearModelsCache, resolveFreeModels } from "../../src/models.js";
 import type { ChatContext } from "../../src/config.js";
 import { json } from "./helpers.js";
 
 afterEach(() => { clearModelsCache(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
 const req = (method: string) => new Request("https://api.trendingai.cn/api/chat/models", { method });
-const ctxWith = (providers: ChatContext["providers"]) => ({ providers }) as ChatContext;
+const ctxWith = (providers: ChatContext["providers"], free?: string[]) =>
+  ({ providers, freeModels: resolveFreeModels(providers, free) }) as ChatContext;
 const openaiOnly = ctxWith({ openai: { apiKey: "k" } });
 
 describe("GET /api/chat/models", () => {
@@ -61,6 +62,18 @@ describe("GET /api/chat/models", () => {
     const entry = body.models.find((m: any) => m.id === body.default);
     expect(entry).toBeDefined();
     expect(entry.minTier).toBe("user");
+  });
+
+  it("只配智谱 + models.free：default 为宿主指定的免费模型，在目录内且标 user", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ models: [{ slug: "glm-5.3" }, { slug: "glm-5.3-flash" }] }),
+    }));
+    const res = await handleChatModels(req("GET"), ctxWith({ zhipu: { apiKey: "k" } }, ["glm-5.3-flash"]));
+    const body = await json(res);
+    expect(body.default).toBe("glm-5.3-flash");
+    expect(body.models.find((m: any) => m.id === body.default).minTier).toBe("user");
+    expect(body.models.find((m: any) => m.id === "glm-5.3").minTier).toBe("pro");
   });
 
   it("OpenAI 拉取失败的降级目录同样带 default 且指向目录内", async () => {

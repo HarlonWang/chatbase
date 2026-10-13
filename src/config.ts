@@ -1,5 +1,7 @@
 // 宿主与本库的唯一配置边界。本库不认识用户与订阅：档位由宿主的 resolveTier 裁决后传入。
 
+import { resolveFreeModels } from "./models.js";
+
 export type Tier = "anonymous" | "user" | "pro";
 
 export type ProviderId = "openai" | "deepseek" | "zhipu";
@@ -25,6 +27,14 @@ export interface CreditsConfig {
   rateCard: Record<string, number>;
   /** 全局日预算（微美元）。匿名 / 登录分池，user 与 pro 同池 */
   globalBudgetMicros: { anonymous: number; user: number };
+}
+
+export interface ModelsConfig {
+  /**
+   * 免费档（anonymous / user）可用的模型，首个为默认模型；须属于已启用的厂商。
+   * 不给则取已启用厂商的内置免费模型；两者皆空时解析上下文直接抛错。
+   */
+  free?: string[];
 }
 
 export interface ChatContextInput {
@@ -62,6 +72,7 @@ export interface ChatConfig {
   images?: R2Bucket;
   /** 启用的厂商及凭据，至少一家；未列出的厂商其模型不进目录 */
   providers: Partial<Record<ProviderId, ProviderCredentials>>;
+  models?: ModelsConfig;
   resolveTier: TierResolver;
   prompt: PromptConfig;
   credits?: Partial<CreditsConfig>;
@@ -82,6 +93,8 @@ export interface ChatContext {
   kv: KVNamespace | null;
   images: R2Bucket | null;
   providers: Partial<Record<ProviderId, ProviderCredentials>>;
+  /** 解析后的免费白名单，非空，首个为默认模型 */
+  freeModels: string[];
   resolveTier: TierResolver;
   prompt: PromptConfig;
   credits: CreditsConfig;
@@ -102,12 +115,14 @@ export interface CreateChatOptions {
   basePath?: string;
 }
 
+/** 模型配置不自洽（默认模型所属厂商未启用等）时抛错：宿主首个请求即 500 并带明确日志，不留到免费用户逐条 502 */
 export function resolveContext(config: ChatConfig, basePath = "/api"): ChatContext {
   return {
     db: config.db,
     kv: config.kv ?? null,
     images: config.images ?? null,
     providers: config.providers,
+    freeModels: resolveFreeModels(config.providers, config.models?.free),
     resolveTier: config.resolveTier,
     prompt: config.prompt,
     credits: {

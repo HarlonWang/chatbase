@@ -1,60 +1,65 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
 import {
-  resolveModel, fetchChatModels, clearModelsCache, FREE_MODELS, DEFAULT_MODEL, type ModelEntry,
+  resolveModel, resolveFreeModels, fetchChatModels, clearModelsCache, type ModelEntry, type ModelScope,
 } from "../src/models.js";
-import type { ChatContext } from "../src/config.js";
+import { resolveContext, type ChatContext } from "../src/config.js";
 
 const CACHE_1H = 60 * 60 * 1000;
-const ctxWith = (providers: ChatContext["providers"]) => ({ providers }) as ChatContext;
+const ctxWith = (providers: ChatContext["providers"], free?: string[]) =>
+  ({ providers, freeModels: resolveFreeModels(providers, free) }) as ChatContext;
+// 三家全启用、走内置免费白名单：裁决只剩档位与形状规则
+const ALL: ModelScope = ctxWith({ openai: { apiKey: "k" }, deepseek: { apiKey: "k" }, zhipu: { apiKey: "k" } });
+const FREE_MODELS = ALL.freeModels;
+const DEFAULT_MODEL = FREE_MODELS[0];
 
 describe("resolveModel（服务端模型强制）", () => {
   it("free：请求非白名单模型 → 降级默认", () => {
-    expect(resolveModel("user", "gpt-5.5")).toBe(DEFAULT_MODEL);
-    expect(resolveModel("anonymous", "gpt-5.5")).toBe(DEFAULT_MODEL);
+    expect(resolveModel(ALL, "user", "gpt-5.5")).toBe(DEFAULT_MODEL);
+    expect(resolveModel(ALL, "anonymous", "gpt-5.5")).toBe(DEFAULT_MODEL);
   });
   it("free：请求白名单模型 → 用之", () => {
-    expect(resolveModel("user", "gpt-5.6-luna")).toBe("gpt-5.6-luna");
+    expect(resolveModel(ALL, "user", "gpt-5.6-luna")).toBe("gpt-5.6-luna");
   });
   it("free：旧默认 gpt-5.4 已不在白名单 → 降级默认", () => {
-    expect(resolveModel("user", "gpt-5.4")).toBe(DEFAULT_MODEL);
+    expect(resolveModel(ALL, "user", "gpt-5.4")).toBe(DEFAULT_MODEL);
   });
   it("free：无 requested → 默认", () => {
-    expect(resolveModel("user", undefined)).toBe(DEFAULT_MODEL);
+    expect(resolveModel(ALL, "user", undefined)).toBe(DEFAULT_MODEL);
   });
   it("pro：分档模型（sol/terra/luna）→ 用之", () => {
-    expect(resolveModel("pro", "gpt-5.6-sol")).toBe("gpt-5.6-sol");
-    expect(resolveModel("pro", "gpt-5.6-terra")).toBe("gpt-5.6-terra");
-    expect(resolveModel("pro", "gpt-5.6-luna")).toBe("gpt-5.6-luna");
+    expect(resolveModel(ALL, "pro", "gpt-5.6-sol")).toBe("gpt-5.6-sol");
+    expect(resolveModel(ALL, "pro", "gpt-5.6-terra")).toBe("gpt-5.6-terra");
+    expect(resolveModel(ALL, "pro", "gpt-5.6-luna")).toBe("gpt-5.6-luna");
   });
   it("pro：已退役的 gpt-5.4 / 5.5 → 降级默认", () => {
-    expect(resolveModel("pro", "gpt-5.4")).toBe(DEFAULT_MODEL);
-    expect(resolveModel("pro", "gpt-5.5")).toBe(DEFAULT_MODEL);
+    expect(resolveModel(ALL, "pro", "gpt-5.4")).toBe(DEFAULT_MODEL);
+    expect(resolveModel(ALL, "pro", "gpt-5.5")).toBe(DEFAULT_MODEL);
   });
   it("free：分档模型不在白名单 → 降级默认", () => {
-    expect(resolveModel("user", "gpt-5.6-sol")).toBe(DEFAULT_MODEL);
+    expect(resolveModel(ALL, "user", "gpt-5.6-sol")).toBe(DEFAULT_MODEL);
   });
   it("pro：新一代 / 新分档名 / 任意后缀，只要 ≥ 5.6 即放行（新模型零登记上架）", () => {
-    expect(resolveModel("pro", "gpt-6-astra")).toBe("gpt-6-astra");
-    expect(resolveModel("pro", "gpt-6")).toBe("gpt-6");                  // 裸名 6.0 ≥ 5.6
-    expect(resolveModel("pro", "gpt-6.1-nova")).toBe("gpt-6.1-nova");    // 未见过的分档名
-    expect(resolveModel("pro", "gpt-5.7-terra")).toBe("gpt-5.7-terra");
-    expect(resolveModel("pro", "gpt-7")).toBe("gpt-7");
-    expect(resolveModel("pro", "gpt-5.6-chat-latest")).toBe("gpt-5.6-chat-latest"); // 多段后缀
+    expect(resolveModel(ALL, "pro", "gpt-6-astra")).toBe("gpt-6-astra");
+    expect(resolveModel(ALL, "pro", "gpt-6")).toBe("gpt-6");                  // 裸名 6.0 ≥ 5.6
+    expect(resolveModel(ALL, "pro", "gpt-6.1-nova")).toBe("gpt-6.1-nova");    // 未见过的分档名
+    expect(resolveModel(ALL, "pro", "gpt-5.7-terra")).toBe("gpt-5.7-terra");
+    expect(resolveModel(ALL, "pro", "gpt-7")).toBe("gpt-7");
+    expect(resolveModel(ALL, "pro", "gpt-5.6-chat-latest")).toBe("gpt-5.6-chat-latest"); // 多段后缀
   });
   it("pro：旧于阈值 / 日期快照 / 非法 → 降级默认", () => {
-    expect(resolveModel("pro", "gpt-5-pro")).toBe(DEFAULT_MODEL);        // 5.0 变体，被版本阈值挡
-    expect(resolveModel("pro", "gpt-5.5-codex")).toBe(DEFAULT_MODEL);
-    expect(resolveModel("pro", "gpt-5.5-2026-04-23")).toBe(DEFAULT_MODEL);
-    expect(resolveModel("pro", "gpt-5.6-sol-2026-06-23")).toBe(DEFAULT_MODEL); // ≥ 5.6 但是日期快照
-    expect(resolveModel("pro", "gpt-6-astra-2026-09-10")).toBe(DEFAULT_MODEL);
-    expect(resolveModel("pro", "gpt-5.2")).toBe(DEFAULT_MODEL);
-    expect(resolveModel("pro", "gpt-5.3-luna")).toBe(DEFAULT_MODEL);     // 分档也受阈值约束
-    expect(resolveModel("pro", "gpt-5")).toBe(DEFAULT_MODEL);            // 5.0 < 5.6
-    expect(resolveModel("pro", "gpt-4o")).toBe(DEFAULT_MODEL);           // 4o：major 后非 . 非 -
-    expect(resolveModel("pro", "gpt-realtime-2.1")).toBe(DEFAULT_MODEL); // 非数字 major
-    expect(resolveModel("pro", "gpt-image-2")).toBe(DEFAULT_MODEL);
-    expect(resolveModel("pro", 123)).toBe(DEFAULT_MODEL);
-    expect(resolveModel("pro", undefined)).toBe(DEFAULT_MODEL);
+    expect(resolveModel(ALL, "pro", "gpt-5-pro")).toBe(DEFAULT_MODEL);        // 5.0 变体，被版本阈值挡
+    expect(resolveModel(ALL, "pro", "gpt-5.5-codex")).toBe(DEFAULT_MODEL);
+    expect(resolveModel(ALL, "pro", "gpt-5.5-2026-04-23")).toBe(DEFAULT_MODEL);
+    expect(resolveModel(ALL, "pro", "gpt-5.6-sol-2026-06-23")).toBe(DEFAULT_MODEL); // ≥ 5.6 但是日期快照
+    expect(resolveModel(ALL, "pro", "gpt-6-astra-2026-09-10")).toBe(DEFAULT_MODEL);
+    expect(resolveModel(ALL, "pro", "gpt-5.2")).toBe(DEFAULT_MODEL);
+    expect(resolveModel(ALL, "pro", "gpt-5.3-luna")).toBe(DEFAULT_MODEL);     // 分档也受阈值约束
+    expect(resolveModel(ALL, "pro", "gpt-5")).toBe(DEFAULT_MODEL);            // 5.0 < 5.6
+    expect(resolveModel(ALL, "pro", "gpt-4o")).toBe(DEFAULT_MODEL);           // 4o：major 后非 . 非 -
+    expect(resolveModel(ALL, "pro", "gpt-realtime-2.1")).toBe(DEFAULT_MODEL); // 非数字 major
+    expect(resolveModel(ALL, "pro", "gpt-image-2")).toBe(DEFAULT_MODEL);
+    expect(resolveModel(ALL, "pro", 123)).toBe(DEFAULT_MODEL);
+    expect(resolveModel(ALL, "pro", undefined)).toBe(DEFAULT_MODEL);
   });
 });
 
@@ -204,11 +209,19 @@ describe("fetchChatModels", () => {
   });
 
   it("未配 OpenAI key 时连免费地板 luna 也不列：目录不能出现必然 502 的项", async () => {
-    const f = stubModels({ [DEEPSEEK]: ["deepseek-flash"] });
+    const f = stubModels({ [DEEPSEEK]: ["deepseek-flash", "deepseek-v4-pro"] });
     vi.stubGlobal("fetch", f);
-    const list = await fetchChatModels(ctxWith({ deepseek: { apiKey: "k" } }), 10_500_000);
-    expect(list.map((m) => m.id)).toEqual(["deepseek-flash"]);
+    const list = await fetchChatModels(ctxWith({ deepseek: { apiKey: "k" } }, ["deepseek-flash"]), 10_500_000);
+    expect(list.map((m) => [m.id, m.minTier])).toEqual([["deepseek-flash", "user"], ["deepseek-v4-pro", "pro"]]);
     expect(f).toHaveBeenCalledTimes(1);
+  });
+
+  it("宿主免费模型是该家的拉取失败地板：只配智谱时智谱失败仍列出免费项", async () => {
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("boom")));
+    const list = await fetchChatModels(ctxWith({ zhipu: { apiKey: "k" } }, ["glm-5.3-flash"]), 10_600_000);
+    expect(list.map((m) => [m.id, m.minTier])).toEqual([["glm-5.3-flash", "user"]]);
+    err.mockRestore();
   });
 
   it("未配 key 不复用上次成功列表：key 被撤后该段立即消失", async () => {
@@ -268,23 +281,23 @@ describe("fetchChatModels", () => {
 
 describe("resolveModel · DeepSeek（动态目录 + 别名）", () => {
   it("DeepSeek 全部 Pro 专属：匿名 / 登录降级默认，Pro 可用", () => {
-    expect(resolveModel("anonymous", "deepseek-flash")).toBe(DEFAULT_MODEL);
-    expect(resolveModel("user", "deepseek-flash")).toBe(DEFAULT_MODEL);
-    expect(resolveModel("user", "deepseek-v4-pro")).toBe(DEFAULT_MODEL);
-    expect(resolveModel("pro", "deepseek-flash")).toBe("deepseek-flash");
-    expect(resolveModel("pro", "deepseek-v4-pro")).toBe("deepseek-v4-pro");
+    expect(resolveModel(ALL, "anonymous", "deepseek-flash")).toBe(DEFAULT_MODEL);
+    expect(resolveModel(ALL, "user", "deepseek-flash")).toBe(DEFAULT_MODEL);
+    expect(resolveModel(ALL, "user", "deepseek-v4-pro")).toBe(DEFAULT_MODEL);
+    expect(resolveModel(ALL, "pro", "deepseek-flash")).toBe("deepseek-flash");
+    expect(resolveModel(ALL, "pro", "deepseek-v4-pro")).toBe("deepseek-v4-pro");
   });
   it("旧名经别名换成正式 id 再裁决：Pro 拿到新名，非 Pro 仍降级", () => {
-    expect(resolveModel("pro", "deepseek-v4-flash")).toBe("deepseek-flash");
-    expect(resolveModel("pro", "deepseek-v4-flash-vision-exp")).toBe("deepseek-flash");
-    expect(resolveModel("user", "deepseek-v4-flash")).toBe(DEFAULT_MODEL);
+    expect(resolveModel(ALL, "pro", "deepseek-v4-flash")).toBe("deepseek-flash");
+    expect(resolveModel(ALL, "pro", "deepseek-v4-flash-vision-exp")).toBe("deepseek-flash");
+    expect(resolveModel(ALL, "user", "deepseek-v4-flash")).toBe(DEFAULT_MODEL);
   });
   it("形状合法的新型号零登记上架；旧名 chat/reasoner、实验型、无人认领的 id 降级默认", () => {
-    expect(resolveModel("pro", "deepseek-v5-pro")).toBe("deepseek-v5-pro");
-    expect(resolveModel("pro", "deepseek-chat")).toBe(DEFAULT_MODEL);
-    expect(resolveModel("pro", "deepseek-reasoner")).toBe(DEFAULT_MODEL);
-    expect(resolveModel("pro", "deepseek-vl-exp")).toBe(DEFAULT_MODEL);
-    expect(resolveModel("pro", "claude-4")).toBe(DEFAULT_MODEL);
+    expect(resolveModel(ALL, "pro", "deepseek-v5-pro")).toBe("deepseek-v5-pro");
+    expect(resolveModel(ALL, "pro", "deepseek-chat")).toBe(DEFAULT_MODEL);
+    expect(resolveModel(ALL, "pro", "deepseek-reasoner")).toBe(DEFAULT_MODEL);
+    expect(resolveModel(ALL, "pro", "deepseek-vl-exp")).toBe(DEFAULT_MODEL);
+    expect(resolveModel(ALL, "pro", "claude-4")).toBe(DEFAULT_MODEL);
   });
 });
 
@@ -332,5 +345,53 @@ describe("Zhipu 目录：/api/v1/models 的 { models: [{ slug }] } 形状", () =
     const list = await fetchChatModels(OPENAI_ONLY, 0);
     expect(list.some((m) => m.provider === "zhipu")).toBe(false);
     expect(f.mock.calls.some(([url]) => String(url).includes(ZHIPU))).toBe(false);
+  });
+});
+
+describe("免费白名单：按已启用厂商解析，宿主可覆盖，解析时自检", () => {
+  const ZHIPU_ONLY = { zhipu: { apiKey: "k" } };
+
+  it("不给 models.free：取已启用厂商的内置免费模型，未启用的不算", () => {
+    expect(resolveFreeModels({ openai: { apiKey: "k" }, zhipu: { apiKey: "k" } })).toEqual(["gpt-5.6-luna"]);
+  });
+
+  it("已启用厂商都没有内置免费模型且未给 models.free → 抛错（不再兜底到未启用厂商的模型）", () => {
+    expect(() => resolveFreeModels(ZHIPU_ONLY)).toThrow(/no free model/);
+    expect(() => resolveFreeModels(ZHIPU_ONLY, [])).toThrow(/no free model/);
+  });
+
+  it("models.free 指向未启用厂商 / 不可提供的 id → 抛错", () => {
+    expect(() => resolveFreeModels(ZHIPU_ONLY, ["gpt-5.6-luna"])).toThrow(/needs openai credentials/);
+    expect(() => resolveFreeModels({ openai: { apiKey: "k" } }, ["gpt-5.4"])).toThrow(/not an offered model/);
+    expect(() => resolveFreeModels(ZHIPU_ONLY, ["claude-4"])).toThrow(/not an offered model/);
+  });
+
+  it("别名换成正式 id 并去重", () => {
+    expect(resolveFreeModels({ deepseek: { apiKey: "k" } }, ["deepseek-v4-flash", "deepseek-flash"])).toEqual(["deepseek-flash"]);
+  });
+
+  it("只配智谱 + 宿主免费模型：免费档拿到 glm-5.3-flash，Pro 可切 glm-5.3", () => {
+    const scope = ctxWith(ZHIPU_ONLY, ["glm-5.3-flash"]);
+    expect(resolveModel(scope, "anonymous", undefined)).toBe("glm-5.3-flash");
+    expect(resolveModel(scope, "user", "glm-5.3")).toBe("glm-5.3-flash");
+    expect(resolveModel(scope, "pro", "glm-5.3")).toBe("glm-5.3");
+  });
+
+  it("请求未启用厂商的模型：任何档位都降级默认，不打必然失败的上游", () => {
+    const scope = ctxWith(ZHIPU_ONLY, ["glm-5.3-flash"]);
+    expect(resolveModel(scope, "pro", "gpt-5.6-sol")).toBe("glm-5.3-flash");
+    expect(resolveModel(scope, "user", "gpt-5.6-luna")).toBe("glm-5.3-flash");
+  });
+
+  it("宿主给了 models.free 即整体替换内置白名单：内置免费的 luna 回到厂商默认档", () => {
+    const scope = ctxWith({ openai: { apiKey: "k" }, zhipu: { apiKey: "k" } }, ["glm-5.3-flash"]);
+    expect(resolveModel(scope, "user", "gpt-5.6-luna")).toBe("glm-5.3-flash");
+    expect(resolveModel(scope, "pro", "gpt-5.6-luna")).toBe("gpt-5.6-luna");
+  });
+
+  it("resolveContext 透传 models.free，配置不自洽时抛错", () => {
+    const base = { db: {} as D1Database, resolveTier: () => ({ tier: "anonymous" as const }), prompt: { brand: "T" } };
+    expect(resolveContext({ ...base, providers: ZHIPU_ONLY, models: { free: ["glm-5.3-flash"] } }).freeModels).toEqual(["glm-5.3-flash"]);
+    expect(() => resolveContext({ ...base, providers: ZHIPU_ONLY })).toThrow(/no free model/);
   });
 });
